@@ -1,50 +1,57 @@
-// ===== MISSILE LAUNCH SIMULATOR =====
+// ===== MISSILE LAUNCH SIMULATOR (Google Maps) =====
 
-// קואורדינטות מקור - ישראל (בסיס פלמחים)
-const ORIGIN = { lat: 31.8839, lng: 34.6868, name: "ישראל" };
+var ORIGIN = { lat: 31.8839, lng: 34.6868 };
 
-// מצב האפליקציה
-const state = {
+// Israel bounding box for blocking
+var ISRAEL_BOUNDS = {
+    north: 33.35,
+    south: 29.45,
+    west: 34.25,
+    east: 35.90
+};
+
+var state = {
     selectedTarget: null,
     selectedWarhead: null,
     map: null,
-    missileMarker: null,
-    pathLine: null,
-    trailLine: null,
     targetMarker: null,
     originMarker: null,
+    pathLine: null,
+    missileMarker: null,
+    trailLine: null,
+    blastCircles: [],
     isFlying: false,
-    flightInterval: null,
-    clockInterval: null,
+    flightDuration: 0,
+    animFrameId: null
 };
 
-// ===== BOOT SEQUENCE =====
-const bootMessages = [
-    "מאתחל מערכות...",
-    "טוען מודול GPS...",
-    "מחבר ללוויינים...",
-    "בודק מערכת ניווט...",
-    "מאמת הרשאות שיגור...",
-    "טוען נתוני מפה...",
-    "מערכת מוכנה ✓",
+// ===== BOOT =====
+var bootMessages = [
+    "Initializing systems...",
+    "Loading GPS module...",
+    "Connecting to satellites...",
+    "Checking navigation...",
+    "Verifying launch auth...",
+    "Loading map data...",
+    "System ready"
 ];
 
 function runBootSequence() {
-    const bar = document.getElementById("bootBar");
-    const status = document.getElementById("bootStatus");
-    let step = 0;
-    const totalSteps = bootMessages.length;
+    var bar = document.getElementById("bootBar");
+    var status = document.getElementById("bootStatus");
+    var step = 0;
+    var total = bootMessages.length;
 
-    const interval = setInterval(() => {
-        if (step < totalSteps) {
+    var iv = setInterval(function() {
+        if (step < total) {
             status.textContent = bootMessages[step];
-            bar.style.width = ((step + 1) / totalSteps * 100) + "%";
+            bar.style.width = ((step + 1) / total * 100) + "%";
             step++;
         } else {
-            clearInterval(interval);
-            setTimeout(() => {
+            clearInterval(iv);
+            setTimeout(function() {
                 document.getElementById("boot-screen").style.opacity = "0";
-                setTimeout(() => {
+                setTimeout(function() {
                     document.getElementById("boot-screen").classList.add("hidden");
                     document.getElementById("main-app").classList.remove("hidden");
                     initApp();
@@ -54,7 +61,7 @@ function runBootSequence() {
     }, 500);
 }
 
-// ===== INIT APP =====
+// ===== INIT =====
 function initApp() {
     initMap();
     initClock();
@@ -63,204 +70,241 @@ function initApp() {
 
 // ===== MAP =====
 function initMap() {
-    state.map = L.map("map", {
-        center: [29, 45],
+    state.map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 29, lng: 45 },
         zoom: 5,
-        zoomControl: false,
-        attributionControl: false,
+        mapTypeId: google.maps.MapTypeId.SATELLITE,
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: false,
+        styles: []
     });
 
-    // Dark map tiles
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-    }).addTo(state.map);
-
-    L.control.zoom({ position: "topright" }).addTo(state.map);
-
-    // סמן מקור - ישראל
-    state.originMarker = L.marker([ORIGIN.lat, ORIGIN.lng], {
-        icon: L.divIcon({
-            className: "origin-marker-icon",
-            html: "🇮🇱",
-            iconSize: [30, 30],
-            iconAnchor: [15, 15],
-        }),
-    }).addTo(state.map).bindTooltip("בסיס שיגור - ישראל", {
-        permanent: false,
-        direction: "top",
+    // Origin marker - Israel
+    state.originMarker = new google.maps.Marker({
+        position: ORIGIN,
+        map: state.map,
+        title: "Launch Base - Israel",
+        icon: {
+            url: "data:image/svg+xml," + encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">' +
+                '<circle cx="20" cy="20" r="18" fill="#22c55e" fill-opacity="0.3" stroke="#22c55e" stroke-width="2"/>' +
+                '<text x="20" y="26" text-anchor="middle" font-size="18">&#x1F1EE;&#x1F1F1;</text>' +
+                '</svg>'
+            ),
+            scaledSize: new google.maps.Size(40, 40),
+            anchor: new google.maps.Point(20, 20)
+        },
+        zIndex: 100
     });
+
+    // Click on map to select target
+    state.map.addListener("click", function(e) {
+        if (state.isFlying) return;
+        handleMapClick(e.latLng);
+    });
+}
+
+// ===== CHECK IF IN ISRAEL =====
+function isInIsrael(lat, lng) {
+    return lat >= ISRAEL_BOUNDS.south && lat <= ISRAEL_BOUNDS.north &&
+           lng >= ISRAEL_BOUNDS.west && lng <= ISRAEL_BOUNDS.east;
+}
+
+function showIsraelWarning() {
+    var el = document.getElementById("israelWarning");
+    el.classList.remove("hidden");
+    setTimeout(function() {
+        el.classList.add("hidden");
+    }, 2500);
+}
+
+// ===== MAP CLICK =====
+function handleMapClick(latLng) {
+    var lat = latLng.lat();
+    var lng = latLng.lng();
+
+    // Block Israel
+    if (isInIsrael(lat, lng)) {
+        showIsraelWarning();
+        return;
+    }
+
+    state.selectedTarget = {
+        lat: lat,
+        lng: lng,
+        name: "Loading..."
+    };
+
+    // Place target marker
+    if (state.targetMarker) {
+        state.targetMarker.setPosition(latLng);
+    } else {
+        state.targetMarker = new google.maps.Marker({
+            position: latLng,
+            map: state.map,
+            icon: {
+                url: "data:image/svg+xml," + encodeURIComponent(
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">' +
+                    '<circle cx="22" cy="22" r="20" fill="#ef4444" fill-opacity="0.2" stroke="#ef4444" stroke-width="2">' +
+                    '<animate attributeName="r" values="14;20;14" dur="2s" repeatCount="indefinite"/>' +
+                    '<animate attributeName="fill-opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite"/>' +
+                    '</circle>' +
+                    '<circle cx="22" cy="22" r="5" fill="#ef4444"/>' +
+                    '<line x1="22" y1="2" x2="22" y2="42" stroke="#ef4444" stroke-width="1" opacity="0.5"/>' +
+                    '<line x1="2" y1="22" x2="42" y2="22" stroke="#ef4444" stroke-width="1" opacity="0.5"/>' +
+                    '</svg>'
+                ),
+                scaledSize: new google.maps.Size(44, 44),
+                anchor: new google.maps.Point(22, 22)
+            },
+            zIndex: 200
+        });
+    }
+
+    // Draw path line
+    if (state.pathLine) state.pathLine.setMap(null);
+    state.pathLine = new google.maps.Polyline({
+        path: [ORIGIN, { lat: lat, lng: lng }],
+        strokeColor: "#ef4444",
+        strokeOpacity: 0.5,
+        strokeWeight: 2,
+        geodesic: true,
+        icons: [{
+            icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 },
+            offset: "0",
+            repeat: "20px"
+        }],
+        map: state.map
+    });
+
+    // Reverse geocode
+    var geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ location: latLng }, function(results, geoStatus) {
+        var name = lat.toFixed(4) + ", " + lng.toFixed(4);
+        if (geoStatus === "OK" && results && results.length > 0) {
+            // Try to find a country or city name
+            for (var i = 0; i < results.length; i++) {
+                var r = results[i];
+                for (var j = 0; j < r.types.length; j++) {
+                    if (r.types[j] === "country" || r.types[j] === "administrative_area_level_1") {
+                        name = r.formatted_address;
+                        break;
+                    }
+                }
+            }
+            if (name === lat.toFixed(4) + ", " + lng.toFixed(4) && results[0]) {
+                name = results[0].formatted_address;
+            }
+        }
+        state.selectedTarget.name = name;
+        document.getElementById("infoTarget").textContent = name;
+    });
+
+    // Update info
+    document.getElementById("infoCoords").textContent = lat.toFixed(4) + ", " + lng.toFixed(4);
+
+    var dist = calculateDistance(ORIGIN.lat, ORIGIN.lng, lat, lng);
+    document.getElementById("infoDistance").textContent = Math.round(dist) + " km";
+
+    // Flight time 5-7 min
+    state.flightDuration = getRandomFlightTime();
+    var mins = Math.floor(state.flightDuration / 60);
+    var secs = state.flightDuration % 60;
+
+    document.getElementById("missionInfo").classList.remove("hidden");
+    document.getElementById("infoETA").textContent = mins + ":" + padZero(secs);
+
+    updateLaunchButton();
 }
 
 // ===== CLOCK =====
 function initClock() {
-    const clockEl = document.getElementById("clock");
+    var el = document.getElementById("clock");
     function update() {
-        const now = new Date();
-        clockEl.textContent = now.toLocaleTimeString("he-IL", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-        });
+        var now = new Date();
+        el.textContent = padZero(now.getHours()) + ":" + padZero(now.getMinutes()) + ":" + padZero(now.getSeconds());
     }
     update();
-    state.clockInterval = setInterval(update, 1000);
+    setInterval(update, 1000);
 }
 
 // ===== EVENT LISTENERS =====
 function initEventListeners() {
-    // כפתורי יעד
-    document.querySelectorAll(".target-btn").forEach(btn => {
-        btn.addEventListener("click", () => selectTarget(btn));
-    });
+    var warheadBtns = document.querySelectorAll(".warhead-btn");
+    for (var i = 0; i < warheadBtns.length; i++) {
+        (function(btn) {
+            btn.addEventListener("click", function() { selectWarhead(btn); });
+        })(warheadBtns[i]);
+    }
 
-    // כפתורי ראש נפץ
-    document.querySelectorAll(".warhead-btn").forEach(btn => {
-        btn.addEventListener("click", () => selectWarhead(btn));
-    });
-
-    // כפתור שיגור
-    document.getElementById("launchBtn").addEventListener("click", () => {
+    document.getElementById("launchBtn").addEventListener("click", function() {
         if (!state.isFlying && state.selectedTarget && state.selectedWarhead) {
             showConfirmDialog();
         }
     });
 
-    // אישור שיגור
-    document.getElementById("confirmYes").addEventListener("click", () => {
+    document.getElementById("confirmYes").addEventListener("click", function() {
         hideConfirmDialog();
         launchMissile();
     });
 
-    document.getElementById("confirmNo").addEventListener("click", () => {
+    document.getElementById("confirmNo").addEventListener("click", function() {
         hideConfirmDialog();
     });
 }
 
-// ===== TARGET SELECTION =====
-function selectTarget(btn) {
-    if (state.isFlying) return;
-
-    document.querySelectorAll(".target-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-
-    state.selectedTarget = {
-        lat: parseFloat(btn.dataset.lat),
-        lng: parseFloat(btn.dataset.lng),
-        name: btn.dataset.name,
-        key: btn.dataset.target,
-    };
-
-    // סמן יעד על המפה
-    if (state.targetMarker) state.map.removeLayer(state.targetMarker);
-    state.targetMarker = L.marker([state.selectedTarget.lat, state.selectedTarget.lng], {
-        icon: L.divIcon({
-            className: "target-marker-icon",
-            html: "🎯",
-            iconSize: [35, 35],
-            iconAnchor: [17, 17],
-        }),
-    }).addTo(state.map).bindTooltip(state.selectedTarget.name, {
-        permanent: true,
-        direction: "top",
-        className: "target-tooltip",
-    });
-
-    // קו מקור -> יעד (מקווקו)
-    if (state.pathLine) state.map.removeLayer(state.pathLine);
-    state.pathLine = L.polyline(
-        [[ORIGIN.lat, ORIGIN.lng], [state.selectedTarget.lat, state.selectedTarget.lng]],
-        { color: "#ef4444", weight: 2, dashArray: "10 8", opacity: 0.5 }
-    ).addTo(state.map);
-
-    // מרכוז המפה
-    state.map.fitBounds(state.pathLine.getBounds(), { padding: [60, 60] });
-
-    updateMissionInfo();
-    updateLaunchButton();
-}
-
-// ===== WARHEAD SELECTION =====
+// ===== WARHEAD =====
 function selectWarhead(btn) {
     if (state.isFlying) return;
-
-    document.querySelectorAll(".warhead-btn").forEach(b => b.classList.remove("active"));
+    var all = document.querySelectorAll(".warhead-btn");
+    for (var i = 0; i < all.length; i++) all[i].classList.remove("active");
     btn.classList.add("active");
 
     state.selectedWarhead = {
-        type: btn.dataset.warhead,
-        power: parseInt(btn.dataset.power),
+        type: btn.getAttribute("data-warhead"),
+        power: parseInt(btn.getAttribute("data-power")),
         name: btn.querySelector(".wh-name").textContent,
-        desc: btn.querySelector(".wh-desc").textContent,
+        desc: btn.querySelector(".wh-desc").textContent
     };
 
-    updateMissionInfo();
+    document.getElementById("infoWarhead").textContent = state.selectedWarhead.name;
+    document.getElementById("missionInfo").classList.remove("hidden");
     updateLaunchButton();
 }
 
-// ===== MISSION INFO =====
-function updateMissionInfo() {
-    const section = document.getElementById("missionInfo");
-
-    if (state.selectedTarget) {
-        section.classList.remove("hidden");
-        document.getElementById("infoTarget").textContent = state.selectedTarget.name;
-
-        const dist = calculateDistance(
-            ORIGIN.lat, ORIGIN.lng,
-            state.selectedTarget.lat, state.selectedTarget.lng
-        );
-        document.getElementById("infoDistance").textContent = Math.round(dist) + " ק\"מ";
-
-        // זמן טיסה אקראי 5-7 דקות
-        const flightSeconds = getRandomFlightTime();
-        const mins = Math.floor(flightSeconds / 60);
-        const secs = flightSeconds % 60;
-        document.getElementById("infoETA").textContent =
-            `${mins}:${secs.toString().padStart(2, "0")} דקות`;
-
-        // שמירת זמן הטיסה
-        state.flightDuration = flightSeconds;
-    }
-
-    if (state.selectedWarhead) {
-        document.getElementById("infoWarhead").textContent = state.selectedWarhead.name;
-    }
-}
-
 function updateLaunchButton() {
-    const btn = document.getElementById("launchBtn");
-    const hint = document.getElementById("launchHint");
-
+    var btn = document.getElementById("launchBtn");
+    var hint = document.getElementById("launchHint");
     if (state.selectedTarget && state.selectedWarhead) {
         btn.classList.remove("disabled");
         btn.disabled = false;
-        hint.textContent = `לחץ לשיגור טיל לעבר ${state.selectedTarget.name}`;
+        hint.textContent = "Ready to launch";
         hint.style.color = "#ef4444";
     } else if (!state.selectedTarget) {
-        hint.textContent = "בחר יעד כדי להמשיך";
+        hint.textContent = "Click on map to select target";
     } else {
-        hint.textContent = "בחר ראש נפץ כדי להמשיך";
+        hint.textContent = "Select warhead to continue";
     }
 }
 
-// ===== CONFIRM DIALOG =====
-let confirmInterval = null;
+// ===== CONFIRM =====
+var confirmInterval = null;
 
 function showConfirmDialog() {
-    const overlay = document.getElementById("confirmOverlay");
-    overlay.classList.remove("hidden");
-
+    document.getElementById("confirmOverlay").classList.remove("hidden");
     document.getElementById("confirmText").innerHTML =
-        `האם לשגר טיל מסוג <strong>${state.selectedWarhead.name}</strong><br>` +
-        `לעבר <strong>${state.selectedTarget.name}</strong>?`;
+        "Launch <strong>" + state.selectedWarhead.name + "</strong> missile<br>" +
+        "to <strong>" + state.selectedTarget.name + "</strong>?";
 
-    let countdown = 10;
-    const countdownEl = document.getElementById("confirmCountdown");
-    countdownEl.textContent = countdown;
-
-    confirmInterval = setInterval(() => {
+    var countdown = 10;
+    var el = document.getElementById("confirmCountdown");
+    el.textContent = countdown;
+    confirmInterval = setInterval(function() {
         countdown--;
-        countdownEl.textContent = countdown;
+        el.textContent = countdown;
         if (countdown <= 0) {
             clearInterval(confirmInterval);
             hideConfirmDialog();
@@ -273,190 +317,166 @@ function hideConfirmDialog() {
     document.getElementById("confirmOverlay").classList.add("hidden");
 }
 
-// ===== LAUNCH MISSILE =====
+// ===== LAUNCH =====
 function launchMissile() {
     state.isFlying = true;
 
-    // נעילת כפתורים
-    document.getElementById("launchBtn").classList.add("disabled");
-    document.getElementById("launchBtn").disabled = true;
-    document.getElementById("launchHint").textContent = "🚀 טיל בטיסה...";
+    var btn = document.getElementById("launchBtn");
+    btn.classList.add("disabled");
+    btn.disabled = true;
+    document.getElementById("launchHint").textContent = "MISSILE IN FLIGHT...";
     document.getElementById("launchHint").style.color = "#06b6d4";
 
-    // הכנת נתוני טיסה
-    const totalSeconds = state.flightDuration;
-    const startLat = ORIGIN.lat;
-    const startLng = ORIGIN.lng;
-    const endLat = state.selectedTarget.lat;
-    const endLng = state.selectedTarget.lng;
+    var totalSec = state.flightDuration;
+    var startPos = new google.maps.LatLng(ORIGIN.lat, ORIGIN.lng);
+    var endPos = new google.maps.LatLng(state.selectedTarget.lat, state.selectedTarget.lng);
 
-    // הצגת שכבת טיסה
-    const flightOverlay = document.getElementById("flightOverlay");
-    flightOverlay.classList.remove("hidden");
+    // Show flight overlay
+    document.getElementById("flightOverlay").classList.remove("hidden");
     document.getElementById("flightTarget").textContent = state.selectedTarget.name;
-
-    const totalMins = Math.floor(totalSeconds / 60);
-    const totalSecs = totalSeconds % 60;
     document.getElementById("flightETA").textContent =
-        `${totalMins}:${totalSecs.toString().padStart(2, "0")}`;
+        Math.floor(totalSec / 60) + ":" + padZero(totalSec % 60);
 
-    // סמן טיל
-    state.missileMarker = L.marker([startLat, startLng], {
-        icon: L.divIcon({
-            className: "missile-marker",
-            html: "🚀",
-            iconSize: [30, 30],
-            iconAnchor: [15, 15],
-        }),
-        zIndexOffset: 1000,
-    }).addTo(state.map);
+    // Remove dashed path
+    if (state.pathLine) { state.pathLine.setMap(null); state.pathLine = null; }
 
-    // קו שובל
-    const trailCoords = [[startLat, startLng]];
-    state.trailLine = L.polyline(trailCoords, {
-        color: "#f97316",
-        weight: 3,
-        opacity: 0.7,
-    }).addTo(state.map);
+    // Missile marker
+    state.missileMarker = new google.maps.Marker({
+        position: startPos,
+        map: state.map,
+        icon: {
+            url: "data:image/svg+xml," + encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">' +
+                '<text x="18" y="26" text-anchor="middle" font-size="24">&#x1F680;</text>' +
+                '</svg>'
+            ),
+            scaledSize: new google.maps.Size(36, 36),
+            anchor: new google.maps.Point(18, 18)
+        },
+        zIndex: 500
+    });
 
-    // הסרת קו מקווקו
-    if (state.pathLine) state.map.removeLayer(state.pathLine);
+    // Trail
+    var trailPath = [startPos];
+    state.trailLine = new google.maps.Polyline({
+        path: trailPath,
+        strokeColor: "#f97316",
+        strokeOpacity: 0.7,
+        strokeWeight: 3,
+        geodesic: true,
+        map: state.map
+    });
 
-    // התחלת טיסה
-    const startTime = Date.now();
-    const totalMs = totalSeconds * 1000;
-    let lastTrailUpdate = 0;
+    // Fit bounds to see whole path
+    var bounds = new google.maps.LatLngBounds();
+    bounds.extend(startPos);
+    bounds.extend(endPos);
+    state.map.fitBounds(bounds, 60);
 
-    function animateFlight() {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / totalMs, 1);
+    var startTime = Date.now();
+    var totalMs = totalSec * 1000;
+    var lastTrail = 0;
 
-        // חישוב מיקום נוכחי (Great circle interpolation)
-        const currentLat = startLat + (endLat - startLat) * easeInOutCubic(progress);
-        const currentLng = startLng + (endLng - startLng) * easeInOutCubic(progress);
+    function animate() {
+        var elapsed = Date.now() - startTime;
+        var progress = Math.min(elapsed / totalMs, 1);
+        var ease = easeInOutCubic(progress);
 
-        // עדכון סמן הטיל
-        state.missileMarker.setLatLng([currentLat, currentLng]);
+        var curLat = ORIGIN.lat + (state.selectedTarget.lat - ORIGIN.lat) * ease;
+        var curLng = ORIGIN.lng + (state.selectedTarget.lng - ORIGIN.lng) * ease;
+        var pos = new google.maps.LatLng(curLat, curLng);
 
-        // סיבוב הטיל לכיוון היעד
-        const angle = calculateBearing(currentLat, currentLng, endLat, endLng);
-        const iconHtml = `<span style="display:inline-block;transform:rotate(${angle - 45}deg)">🚀</span>`;
-        state.missileMarker.setIcon(L.divIcon({
-            className: "missile-marker",
-            html: iconHtml,
-            iconSize: [30, 30],
-            iconAnchor: [15, 15],
-        }));
+        state.missileMarker.setPosition(pos);
 
-        // עדכון שובל
-        if (elapsed - lastTrailUpdate > 500) {
-            trailCoords.push([currentLat, currentLng]);
-            state.trailLine.setLatLngs(trailCoords);
-            lastTrailUpdate = elapsed;
+        // Trail update
+        if (elapsed - lastTrail > 500) {
+            trailPath.push(pos);
+            state.trailLine.setPath(trailPath);
+            lastTrail = elapsed;
         }
 
-        // עדכון טיימר
-        const remaining = Math.max(0, totalSeconds - Math.floor(elapsed / 1000));
-        const remMins = Math.floor(remaining / 60);
-        const remSecs = remaining % 60;
+        // Timer
+        var remain = Math.max(0, totalSec - Math.floor(elapsed / 1000));
         document.getElementById("flightTimer").textContent =
-            `${remMins.toString().padStart(2, "0")}:${remSecs.toString().padStart(2, "0")}`;
-
-        // עדכון progress bar
+            padZero(Math.floor(remain / 60)) + ":" + padZero(remain % 60);
         document.getElementById("flightProgress").style.width = (progress * 100) + "%";
-
-        // עדכון ETA
         document.getElementById("flightETA").textContent =
-            `${remMins}:${remSecs.toString().padStart(2, "0")}`;
+            Math.floor(remain / 60) + ":" + padZero(remain % 60);
 
-        // מרכוז מפה (לאט)
-        if (Math.floor(elapsed / 3000) !== Math.floor((elapsed - 16) / 3000)) {
-            state.map.panTo([currentLat, currentLng], { animate: true, duration: 2 });
+        // Pan map slowly
+        if (Math.floor(elapsed / 5000) !== Math.floor((elapsed - 16) / 5000)) {
+            state.map.panTo(pos);
         }
 
         if (progress < 1) {
-            state.flightInterval = requestAnimationFrame(animateFlight);
+            state.animFrameId = requestAnimationFrame(animate);
         } else {
-            // הגענו ליעד!
             onMissileArrived();
         }
     }
 
-    state.flightInterval = requestAnimationFrame(animateFlight);
+    state.animFrameId = requestAnimationFrame(animate);
 }
 
-// ===== MISSILE ARRIVED =====
+// ===== ARRIVED =====
 function onMissileArrived() {
     state.isFlying = false;
-
-    // הסרת שכבת טיסה
     document.getElementById("flightOverlay").classList.add("hidden");
 
-    // הסרת סמן טיל
-    if (state.missileMarker) state.map.removeLayer(state.missileMarker);
+    // Remove missile
+    if (state.missileMarker) { state.missileMarker.setMap(null); state.missileMarker = null; }
 
-    // מרכוז על היעד
-    state.map.setView([state.selectedTarget.lat, state.selectedTarget.lng], 8, {
-        animate: true,
-        duration: 1,
-    });
+    // Zoom to target
+    state.map.setCenter({ lat: state.selectedTarget.lat, lng: state.selectedTarget.lng });
+    state.map.setZoom(8);
 
-    // סמן פיצוץ על המפה
-    const explosionMarker = L.marker(
-        [state.selectedTarget.lat, state.selectedTarget.lng],
-        {
-            icon: L.divIcon({
-                className: "explosion-marker",
-                html: "💥",
-                iconSize: [60, 60],
-                iconAnchor: [30, 30],
-            }),
-            zIndexOffset: 2000,
-        }
-    ).addTo(state.map);
+    // Blast circles
+    var radii = [5000, 15000, 30000];
+    var colors = ["#ff0000", "#ff6600", "#ffaa00"];
+    state.blastCircles = [];
+    for (var i = 0; i < radii.length; i++) {
+        (function(idx) {
+            setTimeout(function() {
+                var c = new google.maps.Circle({
+                    center: { lat: state.selectedTarget.lat, lng: state.selectedTarget.lng },
+                    radius: radii[idx] * state.selectedWarhead.power,
+                    strokeColor: colors[idx],
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    fillColor: colors[idx],
+                    fillOpacity: 0.15,
+                    map: state.map
+                });
+                state.blastCircles.push(c);
+            }, idx * 400);
+        })(i);
+    }
 
-    // עיגולי פיצוץ על המפה
-    const blastCircles = [];
-    const radii = [5000, 15000, 30000];
-    const colors = ["#ff0000", "#ff6600", "#ffaa00"];
-    radii.forEach((r, i) => {
-        setTimeout(() => {
-            const circle = L.circle(
-                [state.selectedTarget.lat, state.selectedTarget.lng],
-                {
-                    radius: r * state.selectedWarhead.power,
-                    color: colors[i],
-                    fillColor: colors[i],
-                    fillOpacity: 0.2,
-                    weight: 2,
-                }
-            ).addTo(state.map);
-            blastCircles.push(circle);
-        }, i * 400);
-    });
-
-    // שכבת פיצוץ
-    const explosionOverlay = document.getElementById("explosionOverlay");
-    explosionOverlay.classList.remove("hidden");
+    // Explosion overlay
+    document.getElementById("explosionOverlay").classList.remove("hidden");
     document.getElementById("explosionDetails").innerHTML =
-        `טיל ${state.selectedWarhead.name} פגע ב-${state.selectedTarget.name}<br>` +
-        `ראש נפץ: ${state.selectedWarhead.desc}`;
+        state.selectedWarhead.name + " hit " + state.selectedTarget.name + "<br>" +
+        "Warhead: " + state.selectedWarhead.desc;
 
-    // הסתרת פיצוץ אחרי 6 שניות ואיפוס
-    setTimeout(() => {
-        explosionOverlay.classList.add("hidden");
-
-        // ניקוי
-        setTimeout(() => {
-            if (state.trailLine) state.map.removeLayer(state.trailLine);
-            state.map.removeLayer(explosionMarker);
-            blastCircles.forEach(c => state.map.removeLayer(c));
-            if (state.targetMarker) state.map.removeLayer(state.targetMarker);
-
-            // איפוס מצב
+    // Reset after 6s
+    setTimeout(function() {
+        document.getElementById("explosionOverlay").classList.add("hidden");
+        setTimeout(function() {
+            cleanup();
             resetState();
         }, 1000);
     }, 6000);
+}
+
+// ===== CLEANUP =====
+function cleanup() {
+    if (state.trailLine) { state.trailLine.setMap(null); state.trailLine = null; }
+    if (state.targetMarker) { state.targetMarker.setMap(null); state.targetMarker = null; }
+    if (state.pathLine) { state.pathLine.setMap(null); state.pathLine = null; }
+    for (var i = 0; i < state.blastCircles.length; i++) {
+        state.blastCircles[i].setMap(null);
+    }
+    state.blastCircles = [];
 }
 
 // ===== RESET =====
@@ -465,54 +485,46 @@ function resetState() {
     state.selectedWarhead = null;
     state.isFlying = false;
 
-    document.querySelectorAll(".target-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".warhead-btn").forEach(b => b.classList.remove("active"));
-    document.getElementById("missionInfo").classList.add("hidden");
+    var all = document.querySelectorAll(".warhead-btn");
+    for (var i = 0; i < all.length; i++) all[i].classList.remove("active");
 
-    const btn = document.getElementById("launchBtn");
+    document.getElementById("missionInfo").classList.add("hidden");
+    document.getElementById("infoCoords").textContent = "-";
+    document.getElementById("infoTarget").textContent = "-";
+    document.getElementById("infoDistance").textContent = "-";
+
+    var btn = document.getElementById("launchBtn");
     btn.classList.add("disabled");
     btn.disabled = true;
-    document.getElementById("launchHint").textContent = "בחר יעד וראש נפץ כדי לשגר";
+    document.getElementById("launchHint").textContent = "Select target and warhead to launch";
     document.getElementById("launchHint").style.color = "";
 
-    // חזרה למבט כללי
-    state.map.setView([29, 45], 5, { animate: true, duration: 1.5 });
+    state.map.setCenter({ lat: 29, lng: 45 });
+    state.map.setZoom(5);
 }
 
-// ===== UTILITY FUNCTIONS =====
-
+// ===== UTILS =====
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    var R = 6371;
+    var dLat = toRad(lat2 - lat1);
+    var dLon = toRad(lon2 - lon1);
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function calculateBearing(lat1, lng1, lat2, lng2) {
-    const dLng = toRad(lng2 - lng1);
-    const y = Math.sin(dLng) * Math.cos(toRad(lat2));
-    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
-    return (toDeg(Math.atan2(y, x)) + 360) % 360;
-}
-
-function toRad(deg) { return deg * Math.PI / 180; }
-function toDeg(rad) { return rad * 180 / Math.PI; }
+function toRad(d) { return d * Math.PI / 180; }
 
 function easeInOutCubic(t) {
-    return t < 0.5
-        ? 4 * t * t * t
-        : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
 function getRandomFlightTime() {
-    // 5-7 דקות בשניות (300-420)
     return Math.floor(Math.random() * (420 - 300 + 1)) + 300;
 }
+
+function padZero(n) { return n < 10 ? "0" + n : "" + n; }
 
 // ===== START =====
 document.addEventListener("DOMContentLoaded", runBootSequence);
