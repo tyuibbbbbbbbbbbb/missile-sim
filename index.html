@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 מערכת שיגור טילים - הדמיה</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <!-- מסך פתיחה -->
+    <div id="boot-screen">
+        <div class="boot-content">
+            <div class="boot-logo">🛡️</div>
+            <h1>מערכת שיגור טילים</h1>
+            <p class="boot-subtitle">MISSILE LAUNCH SYSTEM v3.7.1</p>
+            <div class="boot-progress">
+                <div class="boot-bar" id="bootBar"></div>
+            </div>
+            <p class="boot-status" id="bootStatus">מאתחל מערכות...</p>
+        </div>
+    </div>
+
+    <!-- ממשק ראשי -->
+    <div id="main-app" class="hidden">
+        <!-- סרגל עליון -->
+        <header>
+            <div class="header-left">
+                <span class="header-icon">🛡️</span>
+                <h1>מערכת שיגור טילים</h1>
+            </div>
+            <div class="header-right">
+                <span class="status-dot online"></span>
+                <span>מערכת פעילה</span>
+                <span class="clock" id="clock"></span>
+            </div>
+        </header>
+
+        <div class="app-layout">
+            <!-- פאנל שמאל - בקרה -->
+            <aside class="control-panel">
+                <!-- בחירת יעד -->
+                <div class="panel-section">
+                    <h2>🎯 בחירת יעד</h2>
+                    <div class="target-buttons">
+                        <button class="target-btn" data-target="iran" data-lat="35.6892" data-lng="51.3890" data-name="טהרן, איראן">
+                            <span class="flag">🇮🇷</span>
+                            <span>איראן - טהרן</span>
+                        </button>
+                        <button class="target-btn" data-target="yemen" data-lat="15.3694" data-lng="44.1910" data-name="צנעא, תימן">
+                            <span class="flag">🇾🇪</span>
+                            <span>תימן - צנעא</span>
+                        </button>
+                        <button class="target-btn" data-target="lebanon" data-lat="33.8938" data-lng="35.5018" data-name="ביירות, לבנון">
+                            <span class="flag">🇱🇧</span>
+                            <span>לבנון - ביירות</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- בחירת ראש נפץ -->
+                <div class="panel-section">
+                    <h2>💣 בחירת ראש נפץ</h2>
+                    <div class="warhead-buttons">
+                        <button class="warhead-btn" data-warhead="conventional" data-power="1">
+                            <span class="wh-icon">💥</span>
+                            <span class="wh-name">קונבנציונלי</span>
+                            <span class="wh-desc">500 ק"ג TNT</span>
+                        </button>
+                        <button class="warhead-btn" data-warhead="bunker" data-power="2">
+                            <span class="wh-icon">🏗️</span>
+                            <span class="wh-name">חודר בונקרים</span>
+                            <span class="wh-desc">GBU-28</span>
+                        </button>
+                        <button class="warhead-btn" data-warhead="thermobaric" data-power="3">
+                            <span class="wh-icon">🔥</span>
+                            <span class="wh-name">תרמוברי</span>
+                            <span class="wh-desc">TOS-1 Buratino</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- מידע על המשימה -->
+                <div class="panel-section mission-info hidden" id="missionInfo">
+                    <h2>📊 נתוני משימה</h2>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">יעד</span>
+                            <span class="info-value" id="infoTarget">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">ראש נפץ</span>
+                            <span class="info-value" id="infoWarhead">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">מרחק</span>
+                            <span class="info-value" id="infoDistance">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">זמן טיסה משוער</span>
+                            <span class="info-value" id="infoETA">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- כפתור שיגור -->
+                <div class="panel-section launch-section">
+                    <button id="launchBtn" class="launch-btn disabled" disabled>
+                        <span class="launch-icon">🚀</span>
+                        <span>שיגור טיל</span>
+                    </button>
+                    <p class="launch-hint" id="launchHint">בחר יעד וראש נפץ כדי לשגר</p>
+                </div>
+            </aside>
+
+            <!-- מפה -->
+            <main class="map-container">
+                <div id="map"></div>
+
+                <!-- שכבת טיימר בזמן טיסה -->
+                <div class="flight-overlay hidden" id="flightOverlay">
+                    <div class="flight-info">
+                        <div class="flight-title">🚀 טיל בטיסה</div>
+                        <div class="flight-timer" id="flightTimer">00:00</div>
+                        <div class="flight-progress-bar">
+                            <div class="flight-progress" id="flightProgress"></div>
+                        </div>
+                        <div class="flight-details">
+                            <span>יעד: <strong id="flightTarget">-</strong></span>
+                            <span>ETA: <strong id="flightETA">-</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- שכבת פיצוץ -->
+                <div class="explosion-overlay hidden" id="explosionOverlay">
+                    <div class="explosion-content">
+                        <div class="explosion-rings">
+                            <div class="ring ring-1"></div>
+                            <div class="ring ring-2"></div>
+                            <div class="ring ring-3"></div>
+                        </div>
+                        <div class="explosion-text">
+                            <h2>💥 פגיעה מאושרת!</h2>
+                            <p id="explosionDetails"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- אישור שיגור -->
+                <div class="confirm-overlay hidden" id="confirmOverlay">
+                    <div class="confirm-box">
+                        <div class="confirm-warning">⚠️</div>
+                        <h2>אישור שיגור טיל</h2>
+                        <p id="confirmText"></p>
+                        <div class="confirm-countdown">
+                            <span>שיגור בעוד: </span>
+                            <span id="confirmCountdown" class="countdown-num">10</span>
+                        </div>
+                        <div class="confirm-buttons">
+                            <button id="confirmYes" class="confirm-yes">✅ אשר שיגור</button>
+                            <button id="confirmNo" class="confirm-no">❌ בטל</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
