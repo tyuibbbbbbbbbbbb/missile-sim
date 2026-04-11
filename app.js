@@ -1,530 +1,160 @@
-// ===== MISSILE LAUNCH SIMULATOR (Google Maps) =====
+var ORIGIN={lat:31.8839,lng:34.6868};
+var ISR={n:33.35,s:29.45,w:34.25,e:35.90};
+var S={t:null,w:null,map:null,tm:null,om:null,pl:null,mm:null,tl:null,fly:false,dur:0,af:null};
 
-var ORIGIN = { lat: 31.8839, lng: 34.6868 };
+var BM=["\u05DE\u05D0\u05EA\u05D7\u05DC \u05DE\u05E2\u05E8\u05DB\u05D5\u05EA...","\u05D8\u05D5\u05E2\u05DF GPS...","\u05DE\u05EA\u05D7\u05D1\u05E8 \u05DC\u05DC\u05D5\u05D5\u05D9\u05D9\u05E0\u05D9\u05DD...","\u05D1\u05D5\u05D3\u05E7 \u05E0\u05D9\u05D5\u05D5\u05D8...","\u05DE\u05D0\u05DE\u05EA \u05D4\u05E8\u05E9\u05D0\u05D5\u05EA...","\u05D8\u05D5\u05E2\u05DF \u05DE\u05E4\u05D4...","\u05DE\u05E2\u05E8\u05DB\u05EA \u05DE\u05D5\u05DB\u05E0\u05D4 \u2713"];
 
-// Israel bounding box for blocking
-var ISRAEL_BOUNDS = {
-    north: 33.35,
-    south: 29.45,
-    west: 34.25,
-    east: 35.90
-};
+function runBootSequence(){
+var bar=document.getElementById("bootBar"),st=document.getElementById("bootStatus"),step=0;
+var iv=setInterval(function(){
+if(step<BM.length){st.textContent=BM[step];bar.style.width=((step+1)/BM.length*100)+"%";step++;}
+else{clearInterval(iv);setTimeout(function(){document.getElementById("boot-screen").style.opacity="0";
+setTimeout(function(){document.getElementById("boot-screen").classList.add("hidden");
+document.getElementById("main-app").classList.remove("hidden");initApp();},500);},400);}
+},500);}
 
-var state = {
-    selectedTarget: null,
-    selectedWarhead: null,
-    map: null,
-    targetMarker: null,
-    originMarker: null,
-    pathLine: null,
-    missileMarker: null,
-    trailLine: null,
-    blastCircles: [],
-    isFlying: false,
-    flightDuration: 0,
-    animFrameId: null
-};
+function initApp(){initMap();initClock();initEvents();}
 
-// ===== BOOT =====
-var bootMessages = [
-    "Initializing systems...",
-    "Loading GPS module...",
-    "Connecting to satellites...",
-    "Checking navigation...",
-    "Verifying launch auth...",
-    "Loading map data...",
-    "System ready"
-];
-
-function runBootSequence() {
-    var bar = document.getElementById("bootBar");
-    var status = document.getElementById("bootStatus");
-    var step = 0;
-    var total = bootMessages.length;
-
-    var iv = setInterval(function() {
-        if (step < total) {
-            status.textContent = bootMessages[step];
-            bar.style.width = ((step + 1) / total * 100) + "%";
-            step++;
-        } else {
-            clearInterval(iv);
-            setTimeout(function() {
-                document.getElementById("boot-screen").style.opacity = "0";
-                setTimeout(function() {
-                    document.getElementById("boot-screen").classList.add("hidden");
-                    document.getElementById("main-app").classList.remove("hidden");
-                    initApp();
-                }, 500);
-            }, 400);
-        }
-    }, 500);
+function initMap(){
+S.map=L.map("map",{center:[29,45],zoom:5,zoomControl:false,attributionControl:false});
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:18}).addTo(S.map);
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:18}).addTo(S.map);
+L.control.zoom({position:"topright"}).addTo(S.map);
+S.om=L.marker([ORIGIN.lat,ORIGIN.lng],{icon:L.divIcon({className:"origin-marker-icon",html:"\uD83C\uDDEE\uD83C\uDDF1",iconSize:[30,30],iconAnchor:[15,15]})}).addTo(S.map);
+S.om.bindTooltip("\u05D1\u05E1\u05D9\u05E1 \u05E9\u05D9\u05D2\u05D5\u05E8 - \u05D9\u05E9\u05E8\u05D0\u05DC",{permanent:false,direction:"top"});
+S.map.on("click",function(e){if(!S.fly)handleClick(e.latlng.lat,e.latlng.lng);});
 }
 
-// ===== INIT =====
-function initApp() {
-    initMap();
-    initClock();
-    initEventListeners();
+function isIL(a,b){return a>=ISR.s&&a<=ISR.n&&b>=ISR.w&&b<=ISR.e;}
+
+function showILWarn(){var el=document.getElementById("israelWarning");el.classList.remove("hidden");setTimeout(function(){el.classList.add("hidden");},2500);}
+
+function handleClick(lat,lng){
+if(isIL(lat,lng)){showILWarn();return;}
+S.t={lat:lat,lng:lng,name:"\u05D8\u05D5\u05E2\u05DF..."};
+if(S.tm)S.tm.setLatLng([lat,lng]);
+else{S.tm=L.marker([lat,lng],{icon:L.divIcon({className:"target-marker-icon",html:"\uD83C\uDFAF",iconSize:[35,35],iconAnchor:[17,17]})}).addTo(S.map);}
+if(S.pl)S.map.removeLayer(S.pl);
+S.pl=L.polyline([[ORIGIN.lat,ORIGIN.lng],[lat,lng]],{color:"#ef4444",weight:2,dashArray:"10 8",opacity:0.5}).addTo(S.map);
+S.map.fitBounds(S.pl.getBounds(),{padding:[60,60]});
+fetch("https://nominatim.openstreetmap.org/reverse?lat="+lat+"&lon="+lng+"&format=json&accept-language=he")
+.then(function(r){return r.json();}).then(function(d){
+var nm=lat.toFixed(4)+", "+lng.toFixed(4);
+if(d&&d.display_name){var p=d.display_name.split(",");nm=p.length>=2?p[0].trim()+", "+p[p.length-1].trim():d.display_name;}
+S.t.name=nm;document.getElementById("infoTarget").textContent=nm;
+if(S.tm){S.tm.unbindTooltip();S.tm.bindTooltip(nm,{permanent:true,direction:"top",className:"target-tooltip"});}
+}).catch(function(){S.t.name=lat.toFixed(4)+", "+lng.toFixed(4);document.getElementById("infoTarget").textContent=S.t.name;});
+document.getElementById("infoCoords").textContent=lat.toFixed(4)+", "+lng.toFixed(4);
+var dist=calcDist(ORIGIN.lat,ORIGIN.lng,lat,lng);
+document.getElementById("infoDistance").textContent=Math.round(dist)+' \u05E7"\u05DE';
+S.dur=300+Math.floor(Math.random()*121);
+var m=Math.floor(S.dur/60),s=S.dur%60;
+document.getElementById("missionInfo").classList.remove("hidden");
+document.getElementById("infoETA").textContent=m+":"+pz(s)+" \u05D3\u05E7\u05D5\u05EA";
+updBtn();
 }
 
-// ===== MAP =====
-function initMap() {
-    state.map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 29, lng: 45 },
-        zoom: 5,
-        mapTypeId: google.maps.MapTypeId.SATELLITE,
-        disableDefaultUI: false,
-        zoomControl: true,
-        mapTypeControl: true,
-        streetViewControl: false,
-        fullscreenControl: false,
-        styles: []
-    });
+function initClock(){var el=document.getElementById("clock");function u(){var n=new Date();el.textContent=pz(n.getHours())+":"+pz(n.getMinutes())+":"+pz(n.getSeconds());}u();setInterval(u,1000);}
 
-    // Origin marker - Israel
-    state.originMarker = new google.maps.Marker({
-        position: ORIGIN,
-        map: state.map,
-        title: "Launch Base - Israel",
-        icon: {
-            url: "data:image/svg+xml," + encodeURIComponent(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">' +
-                '<circle cx="20" cy="20" r="18" fill="#22c55e" fill-opacity="0.3" stroke="#22c55e" stroke-width="2"/>' +
-                '<text x="20" y="26" text-anchor="middle" font-size="18">&#x1F1EE;&#x1F1F1;</text>' +
-                '</svg>'
-            ),
-            scaledSize: new google.maps.Size(40, 40),
-            anchor: new google.maps.Point(20, 20)
-        },
-        zIndex: 100
-    });
-
-    // Click on map to select target
-    state.map.addListener("click", function(e) {
-        if (state.isFlying) return;
-        handleMapClick(e.latLng);
-    });
+function initEvents(){
+var wb=document.querySelectorAll(".warhead-btn");
+for(var i=0;i<wb.length;i++)(function(b){b.addEventListener("click",function(){selWH(b)});})(wb[i]);
+document.getElementById("launchBtn").addEventListener("click",function(){if(!S.fly&&S.t&&S.w)showConf();});
+document.getElementById("confirmYes").addEventListener("click",function(){hideConf();launch();});
+document.getElementById("confirmNo").addEventListener("click",function(){hideConf();});
 }
 
-// ===== CHECK IF IN ISRAEL =====
-function isInIsrael(lat, lng) {
-    return lat >= ISRAEL_BOUNDS.south && lat <= ISRAEL_BOUNDS.north &&
-           lng >= ISRAEL_BOUNDS.west && lng <= ISRAEL_BOUNDS.east;
+function selWH(b){
+if(S.fly)return;
+var a=document.querySelectorAll(".warhead-btn");for(var i=0;i<a.length;i++)a[i].classList.remove("active");
+b.classList.add("active");
+S.w={type:b.getAttribute("data-warhead"),power:parseInt(b.getAttribute("data-power")),name:b.querySelector(".wh-name").textContent,desc:b.querySelector(".wh-desc").textContent};
+document.getElementById("infoWarhead").textContent=S.w.name;
+document.getElementById("missionInfo").classList.remove("hidden");updBtn();
 }
 
-function showIsraelWarning() {
-    var el = document.getElementById("israelWarning");
-    el.classList.remove("hidden");
-    setTimeout(function() {
-        el.classList.add("hidden");
-    }, 2500);
+function updBtn(){
+var b=document.getElementById("launchBtn"),h=document.getElementById("launchHint");
+if(S.t&&S.w){b.classList.remove("disabled");b.disabled=false;h.textContent="\u05DE\u05D5\u05DB\u05DF \u05DC\u05E9\u05D9\u05D2\u05D5\u05E8";h.style.color="#ef4444";}
+else if(!S.t){h.textContent="\u05DC\u05D7\u05E5 \u05E2\u05DC \u05D4\u05DE\u05E4\u05D4 \u05DC\u05D1\u05D7\u05D9\u05E8\u05EA \u05D9\u05E2\u05D3";}
+else{h.textContent="\u05D1\u05D7\u05E8 \u05E8\u05D0\u05E9 \u05E0\u05E4\u05E5";}
 }
 
-// ===== MAP CLICK =====
-function handleMapClick(latLng) {
-    var lat = latLng.lat();
-    var lng = latLng.lng();
+var cIv=null;
+function showConf(){
+document.getElementById("confirmOverlay").classList.remove("hidden");
+document.getElementById("confirmText").innerHTML="\u05D4\u05D0\u05DD \u05DC\u05E9\u05D2\u05E8 \u05D8\u05D9\u05DC <strong>"+S.w.name+"</strong><br>\u05DC\u05E2\u05D1\u05E8 <strong>"+S.t.name+"</strong>?";
+var cd=10,el=document.getElementById("confirmCountdown");el.textContent=cd;
+cIv=setInterval(function(){cd--;el.textContent=cd;if(cd<=0){clearInterval(cIv);hideConf();}},1000);
+}
+function hideConf(){if(cIv)clearInterval(cIv);document.getElementById("confirmOverlay").classList.add("hidden");}
 
-    // Block Israel
-    if (isInIsrael(lat, lng)) {
-        showIsraelWarning();
-        return;
-    }
-
-    state.selectedTarget = {
-        lat: lat,
-        lng: lng,
-        name: "Loading..."
-    };
-
-    // Place target marker
-    if (state.targetMarker) {
-        state.targetMarker.setPosition(latLng);
-    } else {
-        state.targetMarker = new google.maps.Marker({
-            position: latLng,
-            map: state.map,
-            icon: {
-                url: "data:image/svg+xml," + encodeURIComponent(
-                    '<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">' +
-                    '<circle cx="22" cy="22" r="20" fill="#ef4444" fill-opacity="0.2" stroke="#ef4444" stroke-width="2">' +
-                    '<animate attributeName="r" values="14;20;14" dur="2s" repeatCount="indefinite"/>' +
-                    '<animate attributeName="fill-opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite"/>' +
-                    '</circle>' +
-                    '<circle cx="22" cy="22" r="5" fill="#ef4444"/>' +
-                    '<line x1="22" y1="2" x2="22" y2="42" stroke="#ef4444" stroke-width="1" opacity="0.5"/>' +
-                    '<line x1="2" y1="22" x2="42" y2="22" stroke="#ef4444" stroke-width="1" opacity="0.5"/>' +
-                    '</svg>'
-                ),
-                scaledSize: new google.maps.Size(44, 44),
-                anchor: new google.maps.Point(22, 22)
-            },
-            zIndex: 200
-        });
-    }
-
-    // Draw path line
-    if (state.pathLine) state.pathLine.setMap(null);
-    state.pathLine = new google.maps.Polyline({
-        path: [ORIGIN, { lat: lat, lng: lng }],
-        strokeColor: "#ef4444",
-        strokeOpacity: 0.5,
-        strokeWeight: 2,
-        geodesic: true,
-        icons: [{
-            icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 },
-            offset: "0",
-            repeat: "20px"
-        }],
-        map: state.map
-    });
-
-    // Reverse geocode
-    var geocoder = new google.maps.Geocoder();
-    geocoder.geocode({ location: latLng }, function(results, geoStatus) {
-        var name = lat.toFixed(4) + ", " + lng.toFixed(4);
-        if (geoStatus === "OK" && results && results.length > 0) {
-            // Try to find a country or city name
-            for (var i = 0; i < results.length; i++) {
-                var r = results[i];
-                for (var j = 0; j < r.types.length; j++) {
-                    if (r.types[j] === "country" || r.types[j] === "administrative_area_level_1") {
-                        name = r.formatted_address;
-                        break;
-                    }
-                }
-            }
-            if (name === lat.toFixed(4) + ", " + lng.toFixed(4) && results[0]) {
-                name = results[0].formatted_address;
-            }
-        }
-        state.selectedTarget.name = name;
-        document.getElementById("infoTarget").textContent = name;
-    });
-
-    // Update info
-    document.getElementById("infoCoords").textContent = lat.toFixed(4) + ", " + lng.toFixed(4);
-
-    var dist = calculateDistance(ORIGIN.lat, ORIGIN.lng, lat, lng);
-    document.getElementById("infoDistance").textContent = Math.round(dist) + " km";
-
-    // Flight time 5-7 min
-    state.flightDuration = getRandomFlightTime();
-    var mins = Math.floor(state.flightDuration / 60);
-    var secs = state.flightDuration % 60;
-
-    document.getElementById("missionInfo").classList.remove("hidden");
-    document.getElementById("infoETA").textContent = mins + ":" + padZero(secs);
-
-    updateLaunchButton();
+function launch(){
+S.fly=true;
+document.getElementById("launchBtn").classList.add("disabled");
+document.getElementById("launchBtn").disabled=true;
+document.getElementById("launchHint").textContent="\uD83D\uDE80 \u05D8\u05D9\u05DC \u05D1\u05D8\u05D9\u05E1\u05D4...";
+document.getElementById("launchHint").style.color="#06b6d4";
+document.getElementById("flightOverlay").classList.remove("hidden");
+document.getElementById("flightTarget").textContent=S.t.name;
+document.getElementById("flightETA").textContent=Math.floor(S.dur/60)+":"+pz(S.dur%60);
+if(S.pl){S.map.removeLayer(S.pl);S.pl=null;}
+S.mm=L.marker([ORIGIN.lat,ORIGIN.lng],{icon:L.divIcon({className:"missile-marker",html:"\uD83D\uDE80",iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:1000}).addTo(S.map);
+var trail=[[ORIGIN.lat,ORIGIN.lng]];
+S.tl=L.polyline(trail,{color:"#f97316",weight:3,opacity:0.7}).addTo(S.map);
+var st=Date.now(),ms=S.dur*1000,lt=0;
+function anim(){
+var el=Date.now()-st,p=Math.min(el/ms,1),e=p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+var cLat=ORIGIN.lat+(S.t.lat-ORIGIN.lat)*e,cLng=ORIGIN.lng+(S.t.lng-ORIGIN.lng)*e;
+S.mm.setLatLng([cLat,cLng]);
+var ang=bearing(cLat,cLng,S.t.lat,S.t.lng);
+S.mm.setIcon(L.divIcon({className:"missile-marker",html:'<span style="display:inline-block;transform:rotate('+(ang-45)+'deg)">\uD83D\uDE80</span>',iconSize:[30,30],iconAnchor:[15,15]}));
+if(el-lt>500){trail.push([cLat,cLng]);S.tl.setLatLngs(trail);lt=el;}
+var rem=Math.max(0,S.dur-Math.floor(el/1000)),rm=Math.floor(rem/60),rs=rem%60;
+document.getElementById("flightTimer").textContent=pz(rm)+":"+pz(rs);
+document.getElementById("flightProgress").style.width=(p*100)+"%";
+document.getElementById("flightETA").textContent=rm+":"+pz(rs);
+if(Math.floor(el/5000)!==Math.floor((el-16)/5000))S.map.panTo([cLat,cLng],{animate:true,duration:2});
+if(p<1)S.af=requestAnimationFrame(anim);else arrived();
+}
+S.af=requestAnimationFrame(anim);
 }
 
-// ===== CLOCK =====
-function initClock() {
-    var el = document.getElementById("clock");
-    function update() {
-        var now = new Date();
-        el.textContent = padZero(now.getHours()) + ":" + padZero(now.getMinutes()) + ":" + padZero(now.getSeconds());
-    }
-    update();
-    setInterval(update, 1000);
+function arrived(){
+S.fly=false;document.getElementById("flightOverlay").classList.add("hidden");
+if(S.mm){S.map.removeLayer(S.mm);S.mm=null;}
+S.map.setView([S.t.lat,S.t.lng],8,{animate:true,duration:1});
+var rad=[5000,15000,30000],col=["#ff0000","#ff6600","#ffaa00"],circles=[];
+for(var i=0;i<3;i++)(function(idx){setTimeout(function(){
+circles.push(L.circle([S.t.lat,S.t.lng],{radius:rad[idx]*S.w.power,color:col[idx],fillColor:col[idx],fillOpacity:0.15,weight:2}).addTo(S.map));
+},idx*400);})(i);
+var em=L.marker([S.t.lat,S.t.lng],{icon:L.divIcon({className:"explosion-marker",html:"\uD83D\uDCA5",iconSize:[60,60],iconAnchor:[30,30]}),zIndexOffset:2000}).addTo(S.map);
+document.getElementById("explosionOverlay").classList.remove("hidden");
+document.getElementById("explosionDetails").innerHTML="\u05D8\u05D9\u05DC "+S.w.name+" \u05E4\u05D2\u05E2 \u05D1-"+S.t.name+"<br>\u05E8\u05D0\u05E9 \u05E0\u05E4\u05E5: "+S.w.desc;
+setTimeout(function(){document.getElementById("explosionOverlay").classList.add("hidden");
+setTimeout(function(){if(S.tl){S.map.removeLayer(S.tl);S.tl=null;}
+S.map.removeLayer(em);for(var i=0;i<circles.length;i++)S.map.removeLayer(circles[i]);
+if(S.tm){S.map.removeLayer(S.tm);S.tm=null;}reset();},1000);},6000);
 }
 
-// ===== EVENT LISTENERS =====
-function initEventListeners() {
-    var warheadBtns = document.querySelectorAll(".warhead-btn");
-    for (var i = 0; i < warheadBtns.length; i++) {
-        (function(btn) {
-            btn.addEventListener("click", function() { selectWarhead(btn); });
-        })(warheadBtns[i]);
-    }
-
-    document.getElementById("launchBtn").addEventListener("click", function() {
-        if (!state.isFlying && state.selectedTarget && state.selectedWarhead) {
-            showConfirmDialog();
-        }
-    });
-
-    document.getElementById("confirmYes").addEventListener("click", function() {
-        hideConfirmDialog();
-        launchMissile();
-    });
-
-    document.getElementById("confirmNo").addEventListener("click", function() {
-        hideConfirmDialog();
-    });
+function reset(){
+S.t=null;S.w=null;S.fly=false;
+var a=document.querySelectorAll(".warhead-btn");for(var i=0;i<a.length;i++)a[i].classList.remove("active");
+document.getElementById("missionInfo").classList.add("hidden");
+document.getElementById("infoCoords").textContent="-";
+document.getElementById("infoTarget").textContent="-";
+document.getElementById("infoDistance").textContent="-";
+document.getElementById("launchBtn").classList.add("disabled");
+document.getElementById("launchBtn").disabled=true;
+document.getElementById("launchHint").textContent="\u05D1\u05D7\u05E8 \u05D9\u05E2\u05D3 \u05D5\u05E8\u05D0\u05E9 \u05E0\u05E4\u05E5 \u05DC\u05E9\u05D9\u05D2\u05D5\u05E8";
+document.getElementById("launchHint").style.color="";
+S.map.setView([29,45],5,{animate:true,duration:1.5});
 }
 
-// ===== WARHEAD =====
-function selectWarhead(btn) {
-    if (state.isFlying) return;
-    var all = document.querySelectorAll(".warhead-btn");
-    for (var i = 0; i < all.length; i++) all[i].classList.remove("active");
-    btn.classList.add("active");
+function calcDist(a,b,c,d){var R=6371,dL=rad(c-a),dN=rad(d-b),x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function bearing(a,b,c,d){var dL=rad(d-b),y=Math.sin(dL)*Math.cos(rad(c)),x=Math.cos(rad(a))*Math.sin(rad(c))-Math.sin(rad(a))*Math.cos(rad(c))*Math.cos(dL);return(deg(Math.atan2(y,x))+360)%360;}
+function rad(d){return d*Math.PI/180;}
+function deg(r){return r*180/Math.PI;}
+function pz(n){return n<10?"0"+n:""+n;}
 
-    state.selectedWarhead = {
-        type: btn.getAttribute("data-warhead"),
-        power: parseInt(btn.getAttribute("data-power")),
-        name: btn.querySelector(".wh-name").textContent,
-        desc: btn.querySelector(".wh-desc").textContent
-    };
-
-    document.getElementById("infoWarhead").textContent = state.selectedWarhead.name;
-    document.getElementById("missionInfo").classList.remove("hidden");
-    updateLaunchButton();
-}
-
-function updateLaunchButton() {
-    var btn = document.getElementById("launchBtn");
-    var hint = document.getElementById("launchHint");
-    if (state.selectedTarget && state.selectedWarhead) {
-        btn.classList.remove("disabled");
-        btn.disabled = false;
-        hint.textContent = "Ready to launch";
-        hint.style.color = "#ef4444";
-    } else if (!state.selectedTarget) {
-        hint.textContent = "Click on map to select target";
-    } else {
-        hint.textContent = "Select warhead to continue";
-    }
-}
-
-// ===== CONFIRM =====
-var confirmInterval = null;
-
-function showConfirmDialog() {
-    document.getElementById("confirmOverlay").classList.remove("hidden");
-    document.getElementById("confirmText").innerHTML =
-        "Launch <strong>" + state.selectedWarhead.name + "</strong> missile<br>" +
-        "to <strong>" + state.selectedTarget.name + "</strong>?";
-
-    var countdown = 10;
-    var el = document.getElementById("confirmCountdown");
-    el.textContent = countdown;
-    confirmInterval = setInterval(function() {
-        countdown--;
-        el.textContent = countdown;
-        if (countdown <= 0) {
-            clearInterval(confirmInterval);
-            hideConfirmDialog();
-        }
-    }, 1000);
-}
-
-function hideConfirmDialog() {
-    if (confirmInterval) clearInterval(confirmInterval);
-    document.getElementById("confirmOverlay").classList.add("hidden");
-}
-
-// ===== LAUNCH =====
-function launchMissile() {
-    state.isFlying = true;
-
-    var btn = document.getElementById("launchBtn");
-    btn.classList.add("disabled");
-    btn.disabled = true;
-    document.getElementById("launchHint").textContent = "MISSILE IN FLIGHT...";
-    document.getElementById("launchHint").style.color = "#06b6d4";
-
-    var totalSec = state.flightDuration;
-    var startPos = new google.maps.LatLng(ORIGIN.lat, ORIGIN.lng);
-    var endPos = new google.maps.LatLng(state.selectedTarget.lat, state.selectedTarget.lng);
-
-    // Show flight overlay
-    document.getElementById("flightOverlay").classList.remove("hidden");
-    document.getElementById("flightTarget").textContent = state.selectedTarget.name;
-    document.getElementById("flightETA").textContent =
-        Math.floor(totalSec / 60) + ":" + padZero(totalSec % 60);
-
-    // Remove dashed path
-    if (state.pathLine) { state.pathLine.setMap(null); state.pathLine = null; }
-
-    // Missile marker
-    state.missileMarker = new google.maps.Marker({
-        position: startPos,
-        map: state.map,
-        icon: {
-            url: "data:image/svg+xml," + encodeURIComponent(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">' +
-                '<text x="18" y="26" text-anchor="middle" font-size="24">&#x1F680;</text>' +
-                '</svg>'
-            ),
-            scaledSize: new google.maps.Size(36, 36),
-            anchor: new google.maps.Point(18, 18)
-        },
-        zIndex: 500
-    });
-
-    // Trail
-    var trailPath = [startPos];
-    state.trailLine = new google.maps.Polyline({
-        path: trailPath,
-        strokeColor: "#f97316",
-        strokeOpacity: 0.7,
-        strokeWeight: 3,
-        geodesic: true,
-        map: state.map
-    });
-
-    // Fit bounds to see whole path
-    var bounds = new google.maps.LatLngBounds();
-    bounds.extend(startPos);
-    bounds.extend(endPos);
-    state.map.fitBounds(bounds, 60);
-
-    var startTime = Date.now();
-    var totalMs = totalSec * 1000;
-    var lastTrail = 0;
-
-    function animate() {
-        var elapsed = Date.now() - startTime;
-        var progress = Math.min(elapsed / totalMs, 1);
-        var ease = easeInOutCubic(progress);
-
-        var curLat = ORIGIN.lat + (state.selectedTarget.lat - ORIGIN.lat) * ease;
-        var curLng = ORIGIN.lng + (state.selectedTarget.lng - ORIGIN.lng) * ease;
-        var pos = new google.maps.LatLng(curLat, curLng);
-
-        state.missileMarker.setPosition(pos);
-
-        // Trail update
-        if (elapsed - lastTrail > 500) {
-            trailPath.push(pos);
-            state.trailLine.setPath(trailPath);
-            lastTrail = elapsed;
-        }
-
-        // Timer
-        var remain = Math.max(0, totalSec - Math.floor(elapsed / 1000));
-        document.getElementById("flightTimer").textContent =
-            padZero(Math.floor(remain / 60)) + ":" + padZero(remain % 60);
-        document.getElementById("flightProgress").style.width = (progress * 100) + "%";
-        document.getElementById("flightETA").textContent =
-            Math.floor(remain / 60) + ":" + padZero(remain % 60);
-
-        // Pan map slowly
-        if (Math.floor(elapsed / 5000) !== Math.floor((elapsed - 16) / 5000)) {
-            state.map.panTo(pos);
-        }
-
-        if (progress < 1) {
-            state.animFrameId = requestAnimationFrame(animate);
-        } else {
-            onMissileArrived();
-        }
-    }
-
-    state.animFrameId = requestAnimationFrame(animate);
-}
-
-// ===== ARRIVED =====
-function onMissileArrived() {
-    state.isFlying = false;
-    document.getElementById("flightOverlay").classList.add("hidden");
-
-    // Remove missile
-    if (state.missileMarker) { state.missileMarker.setMap(null); state.missileMarker = null; }
-
-    // Zoom to target
-    state.map.setCenter({ lat: state.selectedTarget.lat, lng: state.selectedTarget.lng });
-    state.map.setZoom(8);
-
-    // Blast circles
-    var radii = [5000, 15000, 30000];
-    var colors = ["#ff0000", "#ff6600", "#ffaa00"];
-    state.blastCircles = [];
-    for (var i = 0; i < radii.length; i++) {
-        (function(idx) {
-            setTimeout(function() {
-                var c = new google.maps.Circle({
-                    center: { lat: state.selectedTarget.lat, lng: state.selectedTarget.lng },
-                    radius: radii[idx] * state.selectedWarhead.power,
-                    strokeColor: colors[idx],
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
-                    fillColor: colors[idx],
-                    fillOpacity: 0.15,
-                    map: state.map
-                });
-                state.blastCircles.push(c);
-            }, idx * 400);
-        })(i);
-    }
-
-    // Explosion overlay
-    document.getElementById("explosionOverlay").classList.remove("hidden");
-    document.getElementById("explosionDetails").innerHTML =
-        state.selectedWarhead.name + " hit " + state.selectedTarget.name + "<br>" +
-        "Warhead: " + state.selectedWarhead.desc;
-
-    // Reset after 6s
-    setTimeout(function() {
-        document.getElementById("explosionOverlay").classList.add("hidden");
-        setTimeout(function() {
-            cleanup();
-            resetState();
-        }, 1000);
-    }, 6000);
-}
-
-// ===== CLEANUP =====
-function cleanup() {
-    if (state.trailLine) { state.trailLine.setMap(null); state.trailLine = null; }
-    if (state.targetMarker) { state.targetMarker.setMap(null); state.targetMarker = null; }
-    if (state.pathLine) { state.pathLine.setMap(null); state.pathLine = null; }
-    for (var i = 0; i < state.blastCircles.length; i++) {
-        state.blastCircles[i].setMap(null);
-    }
-    state.blastCircles = [];
-}
-
-// ===== RESET =====
-function resetState() {
-    state.selectedTarget = null;
-    state.selectedWarhead = null;
-    state.isFlying = false;
-
-    var all = document.querySelectorAll(".warhead-btn");
-    for (var i = 0; i < all.length; i++) all[i].classList.remove("active");
-
-    document.getElementById("missionInfo").classList.add("hidden");
-    document.getElementById("infoCoords").textContent = "-";
-    document.getElementById("infoTarget").textContent = "-";
-    document.getElementById("infoDistance").textContent = "-";
-
-    var btn = document.getElementById("launchBtn");
-    btn.classList.add("disabled");
-    btn.disabled = true;
-    document.getElementById("launchHint").textContent = "Select target and warhead to launch";
-    document.getElementById("launchHint").style.color = "";
-
-    state.map.setCenter({ lat: 29, lng: 45 });
-    state.map.setZoom(5);
-}
-
-// ===== UTILS =====
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    var R = 6371;
-    var dLat = toRad(lat2 - lat1);
-    var dLon = toRad(lon2 - lon1);
-    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function toRad(d) { return d * Math.PI / 180; }
-
-function easeInOutCubic(t) {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-function getRandomFlightTime() {
-    return Math.floor(Math.random() * (420 - 300 + 1)) + 300;
-}
-
-function padZero(n) { return n < 10 ? "0" + n : "" + n; }
-
-// ===== START =====
-document.addEventListener("DOMContentLoaded", runBootSequence);
+document.addEventListener("DOMContentLoaded",runBootSequence);

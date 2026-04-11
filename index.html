@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Missile Launch Simulator</title>
+    <title>&#x1F680; &#x05DE;&#x05E2;&#x05E8;&#x05DB;&#x05EA; &#x05E9;&#x05D9;&#x05D2;&#x05D5;&#x05E8; &#x05D8;&#x05D9;&#x05DC;&#x05D9;&#x05DD;</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
     <div id="boot-screen">
         <div class="boot-content">
             <div class="boot-logo">&#x1F6E1;</div>
-            <h1>MISSILE LAUNCH SYSTEM</h1>
+            <h1>&#x05DE;&#x05E2;&#x05E8;&#x05DB;&#x05EA; &#x05E9;&#x05D9;&#x05D2;&#x05D5;&#x05E8; &#x05D8;&#x05D9;&#x05DC;&#x05D9;&#x05DD;</h1>
             <p class="boot-subtitle">v3.7.1</p>
             <div class="boot-progress">
                 <div class="boot-bar" id="bootBar"></div>
             </div>
-            <p class="boot-status" id="bootStatus">Initializing...</p>
+            <p class="boot-status" id="bootStatus">&#x05DE;&#x05D0;&#x05EA;&#x05D7;&#x05DC; &#x05DE;&#x05E2;&#x05E8;&#x05DB;&#x05D5;&#x05EA;...</p>
         </div>
     </div>
 
@@ -23,11 +24,11 @@
         <header>
             <div class="header-left">
                 <span class="header-icon">&#x1F6E1;</span>
-                <h1>Missile Launch System</h1>
+                <h1>&#x05DE;&#x05E2;&#x05E8;&#x05DB;&#x05EA; &#x05E9;&#x05D9;&#x05D2;&#x05D5;&#x05E8; &#x05D8;&#x05D9;&#x05DC;&#x05D9;&#x05DD;</h1>
             </div>
             <div class="header-right">
                 <span class="status-dot online"></span>
-                <span>ONLINE</span>
+                <span>&#x05DE;&#x05E2;&#x05E8;&#x05DB;&#x05EA; &#x05E4;&#x05E2;&#x05D9;&#x05DC;&#x05D4;</span>
                 <span class="clock" id="clock"></span>
             </div>
         </header>
@@ -35,54 +36,54 @@
         <div class="app-layout">
             <aside class="control-panel">
                 <div class="panel-section">
-                    <h2>&#x1F3AF; Select Target</h2>
-                    <p class="section-desc">Click on the map to choose a target location</p>
+                    <h2>&#x1F3AF; &#x05D1;&#x05D7;&#x05D9;&#x05E8;&#x05EA; &#x05D9;&#x05E2;&#x05D3;</h2>
+                    <p class="section-desc">&#x05DC;&#x05D7;&#x05E5; &#x05E2;&#x05DC; &#x05D4;&#x05DE;&#x05E4;&#x05D4; &#x05DC;&#x05D1;&#x05D7;&#x05D9;&#x05E8;&#x05EA; &#x05DE;&#x05D9;&#x05E7;&#x05D5;&#x05DD; &#x05D9;&#x05E2;&#x05D3;</p>
                     <div class="target-info" id="targetInfo">
                         <div class="info-item">
-                            <span class="info-label">Coordinates</span>
+                            <span class="info-label">&#x05E7;&#x05D5;&#x05D0;&#x05D5;&#x05E8;&#x05D3;&#x05D9;&#x05E0;&#x05D8;&#x05D5;&#x05EA;</span>
                             <span class="info-value" id="infoCoords">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Location</span>
+                            <span class="info-label">&#x05DE;&#x05D9;&#x05E7;&#x05D5;&#x05DD;</span>
                             <span class="info-value" id="infoTarget">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Distance</span>
+                            <span class="info-label">&#x05DE;&#x05E8;&#x05D7;&#x05E7;</span>
                             <span class="info-value" id="infoDistance">-</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="panel-section">
-                    <h2>&#x1F4A3; Warhead Selection</h2>
+                    <h2>&#x1F4A3; &#x05D1;&#x05D7;&#x05D9;&#x05E8;&#x05EA; &#x05E8;&#x05D0;&#x05E9; &#x05E0;&#x05E4;&#x05E5;</h2>
                     <div class="warhead-buttons">
                         <button class="warhead-btn" data-warhead="conventional" data-power="1">
                             <span class="wh-icon">&#x1F4A5;</span>
-                            <span class="wh-name">Conventional</span>
-                            <span class="wh-desc">500kg TNT</span>
+                            <span class="wh-name">&#x05E7;&#x05D5;&#x05E0;&#x05D1;&#x05E0;&#x05E6;&#x05D9;&#x05D5;&#x05E0;&#x05DC;&#x05D9;</span>
+                            <span class="wh-desc">500 &#x05E7;"&#x05D2; TNT</span>
                         </button>
                         <button class="warhead-btn" data-warhead="bunker" data-power="2">
                             <span class="wh-icon">&#x1F3D7;</span>
-                            <span class="wh-name">Bunker Buster</span>
+                            <span class="wh-name">&#x05D7;&#x05D5;&#x05D3;&#x05E8; &#x05D1;&#x05D5;&#x05E0;&#x05E7;&#x05E8;&#x05D9;&#x05DD;</span>
                             <span class="wh-desc">GBU-28</span>
                         </button>
                         <button class="warhead-btn" data-warhead="thermobaric" data-power="3">
                             <span class="wh-icon">&#x1F525;</span>
-                            <span class="wh-name">Thermobaric</span>
+                            <span class="wh-name">&#x05EA;&#x05E8;&#x05DE;&#x05D5;&#x05D1;&#x05E8;&#x05D9;</span>
                             <span class="wh-desc">TOS-1</span>
                         </button>
                     </div>
                 </div>
 
                 <div class="panel-section mission-info hidden" id="missionInfo">
-                    <h2>&#x1F4CA; Mission Data</h2>
+                    <h2>&#x1F4CA; &#x05E0;&#x05EA;&#x05D5;&#x05E0;&#x05D9; &#x05DE;&#x05E9;&#x05D9;&#x05DE;&#x05D4;</h2>
                     <div class="info-grid">
                         <div class="info-item">
-                            <span class="info-label">Warhead</span>
+                            <span class="info-label">&#x05E8;&#x05D0;&#x05E9; &#x05E0;&#x05E4;&#x05E5;</span>
                             <span class="info-value" id="infoWarhead">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Flight Time</span>
+                            <span class="info-label">&#x05D6;&#x05DE;&#x05DF; &#x05D8;&#x05D9;&#x05E1;&#x05D4;</span>
                             <span class="info-value" id="infoETA">-</span>
                         </div>
                     </div>
@@ -91,9 +92,9 @@
                 <div class="panel-section launch-section">
                     <button id="launchBtn" class="launch-btn disabled" disabled>
                         <span class="launch-icon">&#x1F680;</span>
-                        <span>LAUNCH</span>
+                        <span>&#x05E9;&#x05D9;&#x05D2;&#x05D5;&#x05E8;</span>
                     </button>
-                    <p class="launch-hint" id="launchHint">Select target and warhead to launch</p>
+                    <p class="launch-hint" id="launchHint">&#x05D1;&#x05D7;&#x05E8; &#x05D9;&#x05E2;&#x05D3; &#x05D5;&#x05E8;&#x05D0;&#x05E9; &#x05E0;&#x05E4;&#x05E5; &#x05DC;&#x05E9;&#x05D9;&#x05D2;&#x05D5;&#x05E8;</p>
                 </div>
             </aside>
 
@@ -102,14 +103,14 @@
 
                 <div class="flight-overlay hidden" id="flightOverlay">
                     <div class="flight-info">
-                        <div class="flight-title">&#x1F680; MISSILE IN FLIGHT</div>
+                        <div class="flight-title">&#x1F680; &#x05D8;&#x05D9;&#x05DC; &#x05D1;&#x05D8;&#x05D9;&#x05E1;&#x05D4;</div>
                         <div class="flight-timer" id="flightTimer">00:00</div>
                         <div class="flight-progress-bar">
                             <div class="flight-progress" id="flightProgress"></div>
                         </div>
                         <div class="flight-details">
-                            <span>Target: <strong id="flightTarget">-</strong></span>
-                            <span>ETA: <strong id="flightETA">-</strong></span>
+                            <span>&#x05D9;&#x05E2;&#x05D3;: <strong id="flightTarget">-</strong></span>
+                            <span>&#x05D6;&#x05DE;&#x05DF; &#x05E0;&#x05D5;&#x05EA;&#x05E8;: <strong id="flightETA">-</strong></span>
                         </div>
                     </div>
                 </div>
@@ -122,7 +123,7 @@
                             <div class="ring ring-3"></div>
                         </div>
                         <div class="explosion-text">
-                            <h2>&#x1F4A5; IMPACT CONFIRMED</h2>
+                            <h2>&#x1F4A5; &#x05E4;&#x05D2;&#x05D9;&#x05E2;&#x05D4; &#x05DE;&#x05D0;&#x05D5;&#x05E9;&#x05E8;&#x05EA;!</h2>
                             <p id="explosionDetails"></p>
                         </div>
                     </div>
@@ -131,15 +132,15 @@
                 <div class="confirm-overlay hidden" id="confirmOverlay">
                     <div class="confirm-box">
                         <div class="confirm-warning">&#x26A0;</div>
-                        <h2>LAUNCH CONFIRMATION</h2>
+                        <h2>&#x05D0;&#x05D9;&#x05E9;&#x05D5;&#x05E8; &#x05E9;&#x05D9;&#x05D2;&#x05D5;&#x05E8;</h2>
                         <p id="confirmText"></p>
                         <div class="confirm-countdown">
-                            <span>Launch in: </span>
+                            <span>&#x05E9;&#x05D9;&#x05D2;&#x05D5;&#x05E8; &#x05D1;&#x05E2;&#x05D5;&#x05D3;: </span>
                             <span id="confirmCountdown" class="countdown-num">10</span>
                         </div>
                         <div class="confirm-buttons">
-                            <button id="confirmYes" class="confirm-yes">CONFIRM LAUNCH</button>
-                            <button id="confirmNo" class="confirm-no">ABORT</button>
+                            <button id="confirmYes" class="confirm-yes">&#x2705; &#x05D0;&#x05E9;&#x05E8; &#x05E9;&#x05D9;&#x05D2;&#x05D5;&#x05E8;</button>
+                            <button id="confirmNo" class="confirm-no">&#x274C; &#x05D1;&#x05D8;&#x05DC;</button>
                         </div>
                     </div>
                 </div>
@@ -147,15 +148,15 @@
                 <div class="israel-warning hidden" id="israelWarning">
                     <div class="israel-warning-box">
                         <div class="warning-icon">&#x1F6AB;</div>
-                        <h2>TARGET DENIED</h2>
-                        <p>Cannot target this location.</p>
+                        <h2>&#x05D9;&#x05E2;&#x05D3; &#x05E0;&#x05D3;&#x05D7;&#x05D4;</h2>
+                        <p>&#x05DC;&#x05D0; &#x05E0;&#x05D9;&#x05EA;&#x05DF; &#x05DC;&#x05D1;&#x05D7;&#x05D5;&#x05E8; &#x05DE;&#x05D9;&#x05E7;&#x05D5;&#x05DD; &#x05D6;&#x05D4;.</p>
                     </div>
                 </div>
             </main>
         </div>
     </div>
 
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB52wOQveTGV3L4yaTVB4yeBq58R463TCo&libraries=geometry"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

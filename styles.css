@@ -631,6 +631,40 @@ header h1 {
     font-size: 16px;
 }
 
+/* ===== LEAFLET MARKERS ===== */
+.leaflet-container {
+    background: #0a0e17;
+}
+
+.missile-marker {
+    font-size: 28px;
+    filter: drop-shadow(0 0 8px rgba(255, 100, 0, 0.8));
+    transition: none;
+}
+
+.target-marker-icon {
+    font-size: 32px;
+    filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.8));
+    animation: pulse 1.5s infinite;
+}
+
+.origin-marker-icon {
+    font-size: 28px;
+    filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.8));
+}
+
+.explosion-marker {
+    font-size: 60px;
+    filter: drop-shadow(0 0 20px rgba(255, 100, 0, 0.9));
+    animation: explosion-pulse 0.5s ease-out infinite;
+}
+
+@keyframes explosion-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
 /* ===== SCROLLBAR ===== */
 .control-panel::-webkit-scrollbar {
     width: 4px;
