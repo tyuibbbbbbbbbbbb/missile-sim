@@ -47,7 +47,7 @@ if(S.tm){S.tm.unbindTooltip();S.tm.bindTooltip(nm,{permanent:true,direction:"top
 document.getElementById("infoCoords").textContent=lat.toFixed(4)+", "+lng.toFixed(4);
 var dist=calcDist(ORIGIN.lat,ORIGIN.lng,lat,lng);
 document.getElementById("infoDistance").textContent=Math.round(dist)+' \u05E7"\u05DE';
-S.dur=300+Math.floor(Math.random()*121);
+S.dur=calcFlightTime(dist);
 var m=Math.floor(S.dur/60),s=S.dur%60;
 document.getElementById("missionInfo").classList.remove("hidden");
 document.getElementById("infoETA").textContent=m+":"+pz(s)+" \u05D3\u05E7\u05D5\u05EA";
@@ -68,7 +68,7 @@ function selWH(b){
 if(S.fly)return;
 var a=document.querySelectorAll(".warhead-btn");for(var i=0;i<a.length;i++)a[i].classList.remove("active");
 b.classList.add("active");
-S.w={type:b.getAttribute("data-warhead"),power:parseInt(b.getAttribute("data-power")),name:b.querySelector(".wh-name").textContent,desc:b.querySelector(".wh-desc").textContent};
+S.w={type:b.getAttribute("data-warhead"),power:parseInt(b.getAttribute("data-power")),name:b.querySelector(".wh-name").textContent,desc:b.querySelector(".wh-desc").textContent,len:b.getAttribute("data-length"),weight:b.getAttribute("data-weight"),range:b.getAttribute("data-range")};
 document.getElementById("infoWarhead").textContent=S.w.name;
 document.getElementById("missionInfo").classList.remove("hidden");updBtn();
 }
@@ -99,7 +99,8 @@ document.getElementById("flightOverlay").classList.remove("hidden");
 document.getElementById("flightTarget").textContent=S.t.name;
 document.getElementById("flightETA").textContent=Math.floor(S.dur/60)+":"+pz(S.dur%60);
 if(S.pl){S.map.removeLayer(S.pl);S.pl=null;}
-S.mm=L.marker([ORIGIN.lat,ORIGIN.lng],{icon:L.divIcon({className:"missile-marker",html:"\uD83D\uDE80",iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:1000}).addTo(S.map);
+var mIcon=L.icon({iconUrl:"missile.ico",iconSize:[32,32],iconAnchor:[16,16]});
+S.mm=L.marker([ORIGIN.lat,ORIGIN.lng],{icon:mIcon,zIndexOffset:1000}).addTo(S.map);
 var trail=[[ORIGIN.lat,ORIGIN.lng]];
 S.tl=L.polyline(trail,{color:"#f97316",weight:3,opacity:0.7}).addTo(S.map);
 var st=Date.now(),ms=S.dur*1000,lt=0;
@@ -108,7 +109,7 @@ var el=Date.now()-st,p=Math.min(el/ms,1),e=p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
 var cLat=ORIGIN.lat+(S.t.lat-ORIGIN.lat)*e,cLng=ORIGIN.lng+(S.t.lng-ORIGIN.lng)*e;
 S.mm.setLatLng([cLat,cLng]);
 var ang=bearing(cLat,cLng,S.t.lat,S.t.lng);
-S.mm.setIcon(L.divIcon({className:"missile-marker",html:'<span style="display:inline-block;transform:rotate('+(ang-45)+'deg)">\uD83D\uDE80</span>',iconSize:[30,30],iconAnchor:[15,15]}));
+S.mm.setIcon(L.icon({iconUrl:"missile.ico",iconSize:[32,32],iconAnchor:[16,16],className:"missile-icon-rot"}));
 if(el-lt>500){trail.push([cLat,cLng]);S.tl.setLatLngs(trail);lt=el;}
 var rem=Math.max(0,S.dur-Math.floor(el/1000)),rm=Math.floor(rem/60),rs=rem%60;
 document.getElementById("flightTimer").textContent=pz(rm)+":"+pz(rs);
@@ -156,5 +157,6 @@ function bearing(a,b,c,d){var dL=rad(d-b),y=Math.sin(dL)*Math.cos(rad(c)),x=Math
 function rad(d){return d*Math.PI/180;}
 function deg(r){return r*180/Math.PI;}
 function pz(n){return n<10?"0"+n:""+n;}
+function calcFlightTime(distKm){if(distKm<100)return 60+Math.floor(Math.random()*61);if(distKm<500)return 90+Math.floor(Math.random()*31);if(distKm<1000)return 120+Math.floor(Math.random()*31);if(distKm<2000)return 150+Math.floor(Math.random()*31);return 150+Math.floor(Math.random()*31);}
 
 document.addEventListener("DOMContentLoaded",runBootSequence);

@@ -219,19 +219,30 @@ header h1 {
     box-shadow: 0 0 15px rgba(249, 115, 22, 0.2);
 }
 
-.wh-icon {
-    font-size: 22px;
+.wh-ico {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.wh-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: right;
 }
 
 .wh-name {
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 .wh-desc {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-secondary);
-    margin-right: auto;
+    line-height: 1.4;
 }
 
 /* ===== MISSION INFO ===== */
